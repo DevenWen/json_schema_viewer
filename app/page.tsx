@@ -22,6 +22,10 @@ export default function Page() {
           type: "string",
           description: "用户电话号码"
         },
+        ext: {
+          type: ["string", "null", "boolean"],
+          description: "多类型字段"
+        },
         address: {
           description: "用户地址",
           oneOf: [

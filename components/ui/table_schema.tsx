@@ -2,7 +2,7 @@ import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 type SchemaProperty = {
-    type?: string;
+    type?: string | string[];
     description?: string;
     properties?: Record<string, SchemaProperty>;
     items?: SchemaProperty;
@@ -38,28 +38,46 @@ const getLimits = (prop: SchemaProperty, isRequired: boolean): React.ReactNode[]
     ));
 };
 
-const PropertyRow: React.FC<{ name: string, value: any, depth: number, requiredFields: string[] }> = ({ name, value, depth, requiredFields }) => {
+const PropertyRow: React.FC<{ name: string, value: any, depth: number, requiredFields: string[], path: string }> = ({ name, value, depth, requiredFields, path }) => {
     const [isExpanded, setIsExpanded] = React.useState(true);
+    const [isHovered, setIsHovered] = React.useState(false);
     const isObject = value.type === 'object' && value.properties;
     const isArray = value.type === 'array' && value.items;
     const isOneOf = value.oneOf;
     const hasChildren = isObject || isArray || isOneOf;
     const isRequired = requiredFields.includes(name);
+    const fieldPath = `${path}.${name}`.replace(/^\./, '');
 
     return (
         <React.Fragment>
-            <tr className="border-b">
+            <tr className="border-b" id={fieldPath}>
                 <td className="p-2 w-1/4">
-                    <div className="flex items-center" style={{ paddingLeft: `${depth * 1.5}rem` }}>
+                    <div
+                        className="flex items-center"
+                        style={{ paddingLeft: `${depth * 1.5}rem` }}
+                        onMouseEnter={() => setIsHovered(true)}
+                        onMouseLeave={() => setIsHovered(false)}
+                    >
                         {hasChildren && (
                             <button onClick={() => setIsExpanded(!isExpanded)} className="mr-2 w-4 h-4 inline-flex items-center justify-center bg-gray-200 rounded-full text-xs">
                                 {isExpanded ? '▼' : '▶'}
                             </button>
                         )}
                         <span className="font-medium">{name}</span>
+                        {isHovered && (
+                            <a href={`#${fieldPath}`} className="ml-1 text-blue-500 hover:text-blue-700">#</a>
+                        )}
                     </div>
                 </td>
-                <td className="p-2 w-1/6">{value.type || (isOneOf ? '多选一' : '未指定')}</td>
+                <td className="p-2 w-1/6">
+                    {Array.isArray(value.type)
+                        ? value.type.map((t, i) => (
+                            <React.Fragment key={i}>
+                                {i > 0 && <span className="text-blue-500"> or </span>}{t}
+                            </React.Fragment>
+                        ))
+                        : (value.type || (isOneOf ? '多选一' : '未指定'))}
+                </td>
                 <td className="p-2 w-1/3">{value.description || ''}</td>
                 <td className="p-2 w-1/4">{getLimits(value, isRequired)}</td>
             </tr>
@@ -73,6 +91,7 @@ const PropertyRow: React.FC<{ name: string, value: any, depth: number, requiredF
                             isArrayItem={isArray}
                             isOneOf={isOneOf}
                             oneOfOptions={isOneOf ? value.oneOf : []}
+                            path={fieldPath}
                         />
                     </td>
                 </tr>
@@ -87,8 +106,9 @@ const PropertyTable: React.FC<{
     requiredFields: string[],
     isArrayItem?: boolean,
     isOneOf?: boolean,
-    oneOfOptions?: any[]
-}> = ({ properties, depth, requiredFields, isArrayItem, isOneOf, oneOfOptions }) => {
+    oneOfOptions?: any[],
+    path: string
+}> = ({ properties, depth, requiredFields, isArrayItem, isOneOf, oneOfOptions, path }) => {
     return (
         <table className="w-full text-sm">
             {depth === 0 && (
@@ -117,11 +137,12 @@ const PropertyTable: React.FC<{
                             value={option}
                             depth={depth}
                             requiredFields={[]}
+                            path={`${path}.oneOf[${index}]`}
                         />
                     ))
                 ) : (
                     Object.entries(properties).map(([key, value]) => (
-                        <PropertyRow key={key} name={key} value={value} depth={depth} requiredFields={requiredFields} />
+                        <PropertyRow key={key} name={key} value={value} depth={depth} requiredFields={requiredFields} path={path} />
                     ))
                 )}
             </tbody>
@@ -131,14 +152,44 @@ const PropertyTable: React.FC<{
 
 
 export const SchemaRenderer: React.FC<{ schema?: SchemaInfo, title: string }> = ({ schema, title }) => {
+    const containerRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        const handleHashChange = () => {
+            const hash = window.location.hash.slice(1);
+            if (hash) {
+                const element = document.getElementById(hash);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        };
+
+        handleHashChange();
+        window.addEventListener('hashchange', handleHashChange);
+        return () => window.removeEventListener('hashchange', handleHashChange);
+    }, []);
+
+    if (!schema || !schema.properties) {
+        return (
+            <Card className="mt-4">
+                <CardHeader>
+                    <CardTitle>{title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p>No schema information available.</p>
+                </CardContent>
+            </Card>
+        )
+    }
 
     return (
         <Card className="mt-4">
             <CardHeader>
                 <CardTitle>{title}</CardTitle>
             </CardHeader>
-            <CardContent>
-                <PropertyTable properties={schema.properties} depth={0} requiredFields={schema.required || []} />
+            <CardContent ref={containerRef}>
+                <PropertyTable properties={schema.properties} depth={0} requiredFields={schema.required || []} path={title.toLowerCase().replace(' ', '_')} />
             </CardContent>
         </Card>
     )
