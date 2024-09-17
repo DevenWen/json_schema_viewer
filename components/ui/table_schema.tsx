@@ -1,5 +1,6 @@
 import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { MarkdownRenderer } from "@/components/ui/markdown-render";
 
 type SchemaProperty = {
     type?: string | string[];
@@ -31,6 +32,8 @@ const getLimits = (prop: SchemaProperty, isRequired: boolean): React.ReactNode[]
     if (prop.default !== undefined) limits.push(`默认值: ${prop.default}`);
     if (isRequired) limits.push('必填');
     if (prop.oneOf) limits.push('多选一');
+
+
     return limits.map((limit, index) => (
         <span key={index} className="inline-block bg-yellow-100 border border-yellow-300 rounded px-1 mr-1 mb-1">
             {limit}
@@ -47,6 +50,15 @@ const PropertyRow: React.FC<{ name: string, value: any, depth: number, requiredF
     const hasChildren = isObject || isArray || isOneOf;
     const isRequired = requiredFields.includes(name);
     const fieldPath = `${path}.${name}`.replace(/^\./, '');
+
+    if (value["x-enum-description"]) {
+        const enumDescriptions = value["x-enum-description"].map((item: { value: any; description: string }) =>
+            `- **${item.value}**: ${item.description}`
+        ).join('\n');
+        value.full_description = (value.description || '') + '\n\n' + enumDescriptions;
+    } else {
+        value.full_description = value.description
+    }
 
     return (
         <React.Fragment>
@@ -78,7 +90,9 @@ const PropertyRow: React.FC<{ name: string, value: any, depth: number, requiredF
                         ))
                         : (value.type || (isOneOf ? '多选一' : '未指定'))}
                 </td>
-                <td className="p-2 w-1/3">{value.description || ''}</td>
+                <td className="p-2 w-1/3">
+                    {value.full_description && <MarkdownRenderer content={value.full_description} />}
+                </td>
                 <td className="p-2 w-1/4">{getLimits(value, isRequired)}</td>
             </tr>
             {isExpanded && hasChildren && (

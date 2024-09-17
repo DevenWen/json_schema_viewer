@@ -52,8 +52,16 @@ export default function Page() {
           ]
         },
         gender: {
-          type: "string",
-          description: "用户性别"
+          type: "integer",
+          description: "用户性别",
+          minimum: 0,
+          maximum: 2,
+          enum: [0, 1, 2],
+          "x-enum-description": [
+            { value: 0, description: "男" },
+            { value: 1, description: "女" },
+            { value: 2, description: "未知" }
+          ]
         }
         ,
         pets: {
